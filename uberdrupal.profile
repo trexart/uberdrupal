@@ -399,6 +399,10 @@ function _uberdrupal_install_theme() {
     // And finally set Acquia Prosper to be the default.
     variable_set('theme_default', 'acquia_prosper');
   }
+  
+  if (in_array('rubik', $themes)) {
+      variable_set('admin_theme', 'rubik');
+  }
 
   // Configure blocks for Acquia Prosper.
   _uberdrupal_setup_blocks();
