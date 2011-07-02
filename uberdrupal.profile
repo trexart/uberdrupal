@@ -55,6 +55,15 @@ function uberdrupal_profile_modules() {
     'uc_order',
     'uc_catalog',
     'uc_cart',
+    
+    // other contrib modules
+    'extlink',
+    'jquery_ui',
+    'jquery_update',
+    'libraries',
+    'pathauto',
+    'poormanscron',
+    'vertical_tabs',
   );
 }
 
@@ -98,6 +107,10 @@ function uberdrupal_profile_tasks(&$task, $url) {
 
       // Install the Administration Menu module if it exists.
       uberdrupal_install_module('admin_menu');
+      
+      // Install Admin and Admin Tools modules if they are available
+      uberdrupal_install_module('admin');
+      uberdrupal_install_module('admin_tools');
 
       // Install Acquia Prosper if the necessary module and themes exist.
       _uberdrupal_install_theme();
