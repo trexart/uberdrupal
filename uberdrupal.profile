@@ -77,6 +77,7 @@ function uberdrupal_profile_modules() {
  */
 function uberdrupal_profile_task_list() {
   return array(
+    'country' => st('Choose country'),
     'config' => st('Configure store'),
     'features' => st('Install features'),
   );
@@ -122,18 +123,18 @@ function uberdrupal_profile_tasks(&$task, $url) {
       require_once drupal_get_path('module', 'uc_store') .'/uc_store.admin.inc';
 
       // Get an array of all the files in the countries directory.
-      $files = _country_import_list();
+      //$files = _country_import_list();
 
       // Unset any countries from the files array that have already been imported.
-      $result = db_query("SELECT * FROM {uc_countries} ORDER BY country_name ASC");
-      while ($country = db_fetch_object($result)) {
-        unset($files[$country->country_id]);
-      }
+      //$result = db_query("SELECT * FROM {uc_countries} ORDER BY country_name ASC");
+      //while ($country = db_fetch_object($result)) {
+      //  unset($files[$country->country_id]);
+      //}
 
       // Install any country remaining in the files array.
-      foreach ($files as $file) {
-        uc_country_import($file['file']);
-      }
+      //foreach ($files as $file) {
+      //  uc_country_import($file['file']);
+      //}
 
       // Setup a catalog term and basic product.
       $edit = array('vid' => 1, 'name' => t('Products'));
@@ -149,6 +150,16 @@ function uberdrupal_profile_tasks(&$task, $url) {
       db_query("UPDATE {permission} SET perm = CONCAT(perm, ', view catalog') WHERE pid = 1");
       db_query("UPDATE {permission} SET perm = CONCAT(perm, ', view catalog, view own orders') WHERE pid = 2");
 
+      // Set $task to next task so the UI will be correct.
+      $task = 'country';
+      drupal_set_title(t('Choose Country'));
+      return drupal_get_form('uberdrupal_country_settings_form', $url);
+      
+      // Choose country to limit extraneous entries
+      case 'country':
+      // Save the values from the country configuration form. (FAPI is not helping us today?)
+      uberdrupal_country_settings_form_submit();
+      
       // Set $task to next task so the UI will be correct.
       $task = 'config';
       drupal_set_title(t('Configure store'));
@@ -172,6 +183,99 @@ function uberdrupal_profile_tasks(&$task, $url) {
       // Move to the completion task.
       $task = 'profile-finished';
       break;
+  }
+}
+
+/**
+ * Build the Ubercart country configuration form.
+ * 
+ * Do this before the store settings so we can set the main location information
+ *
+ * @param $form_state
+ * @param $url
+ *   URL of current installer page, provided by installer.
+ */
+function uberdrupal_country_settings_form(&$form_state, $url) {
+  $form = array(
+    '#action' => $url,
+    '#redirect' => FALSE,
+  );
+
+  $form['select_all'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Worldwide (Select All)'),
+  );
+  
+  // Choose from available country files to import
+  // With reference to the uc country file admin interface.
+
+  // Get an array of all the files in the countries directory.
+
+  /* START copy from uc_store_admin.inc */
+  $files = _country_import_list();
+  foreach ($files as $file) {
+    $import_list[$file['file']] = $file['file'];
+  }
+  if (is_array($import_list)) {
+    ksort($import_list);
+  }
+
+  if (is_array($import_list)) {
+    $options = $import_list;
+  }
+  else {
+    $options = array(t('-None available-'));
+  }
+  $form['import_file'] = array(
+    '#type' => 'select',
+    '#title' => t('Country'),
+    '#options' => $options,
+    '#multiple' => is_array($import_list),
+    '#size' => min(10, count($options)),
+  );
+  /* END from uc_store_admin.inc */
+
+  $form['import_file']['#description'] = t("You can select multiple regions. This option is also available for editing later in the uc store config.");
+  
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save and continue'),
+  );
+  
+  return $form;
+}
+
+function uberdrupal_country_settings_form_submit() {
+  $form_state = array('values' => $_POST);
+
+  $files = array();
+  if (! empty($form_state['values']['select_all'])) {
+    // User chose to import all regions.
+    // Get an array of all the files in the countries directory.
+    $all_countries = $files = _country_import_list();
+
+    // Unset any countries from the files array that have already been imported.
+    $result = db_query("SELECT * FROM {uc_countries} ORDER BY country_name ASC");
+    while ($country = db_fetch_object($result)) {
+      unset($all_countries[$country->country_id]);
+    }
+    // Simplify into an array of filenames.
+    foreach ($all_countries as $country_id => $file) {
+      $files[$country_id] = $file['file'];
+    }
+  }
+  else {
+    // Enabling is additive, does not discard any already-selected regions,
+    // uc_country_remove_form_submit() is too complex to copy here.
+    drupal_set_message(t("Enabling selected regions. Automatically pre-configured country settings are not deleted. Remove them from the UI in '<em>Administer : Store administration : Configuration : Country settings</em>' later if you wish."), 'info');
+    
+    // Import selected countries.
+    $files = $form_state['values']['import_file'];
+  }
+
+  // Install any country remaining in the files array.
+  foreach ($files as $filename) {
+    uc_country_import($filename);
   }
 }
 
