@@ -79,6 +79,7 @@ function uberdrupal_profile_task_list() {
   return array(
     'country' => st('Choose country'),
     'config' => st('Configure store'),
+    'formats' => st('Configure formats'),
     'features' => st('Install features'),
   );
 }
@@ -169,6 +170,16 @@ function uberdrupal_profile_tasks(&$task, $url) {
     case 'config':
       // Save the values from the store configuration form.
       uberdrupal_store_settings_form_submit();
+      
+      // Set $task to next task so the UI will be correct.
+      $task = 'formats';
+      drupal_set_title(t('Configure formats'));
+      return drupal_get_form('uberdrupal_format_settings_form', $url);
+  
+    case 'formats':
+    
+      // Save the values from the format configuration form.
+      uberdrupal_format_settings_form_submit();
 
       // Move to the feature installation task.
       $task = 'features';
@@ -280,10 +291,12 @@ function uberdrupal_country_settings_form_submit() {
     if (strpos($filename,'_840_')) {
         // We found a string inside string
         $disable_usa = false;
+        break;
     }
     if (strpos($filename,'_124_')) {
         // We found a string inside string
         $disable_canada = false;
+        break;
     }
     uc_country_import($filename);
   }
@@ -374,6 +387,154 @@ function uberdrupal_store_settings_form(&$form_state, $url) {
 }
 
 function uberdrupal_store_settings_form_submit() {
+  $form_state = array('values' => $_POST);
+  system_settings_form_submit(array(), $form_state);
+}
+
+function uberdrupal_format_settings_form(&$form_state, $url) {
+    $form['currency'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Currency format'),
+        '#summary callback' => 'summarize_form',
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+      );
+      $form['currency']['uc_currency_code'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Default currency'),
+        '#description' => t('While not used directly in formatting, the currency code is used by other modules as the primary currency for your site.  Enter here your three character <a href="!url">ISO 4217</a> currency code.', array('!url' => 'http://en.wikipedia.org/wiki/ISO_4217#Active_codes')),
+        '#default_value' => variable_get('uc_currency_code', 'USD'),
+        '#maxlength' => 3,
+        '#size' => 5,
+      );
+    
+      $context = array(
+        'revision' => 'formatted-original',
+        'type' => 'amount',
+      );
+      $form['currency']['example'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Current format'),
+        '#value' => uc_price(1000.1234, $context),
+        '#summary' => t('Currency format: @format', array('@format' => uc_price(1000.1234, $context))),
+        '#disabled' => TRUE,
+        '#size' => 10,
+      );
+      $form['currency']['uc_currency_sign'] = uc_textfield(t('Currency Sign'), variable_get('uc_currency_sign', '$'), FALSE, NULL, 10, 10);
+      $form['currency']['uc_currency_sign']['#summary callback'] = 'summarize_null';
+    
+      $form['currency']['uc_sign_after_amount'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Display currency sign after amount.'),
+        '#summary callback' => 'summarize_null',
+        '#default_value' => variable_get('uc_sign_after_amount', FALSE),
+      );
+    
+      $form['currency']['uc_currency_thou'] = uc_textfield(t('Thousands Marker'), variable_get('uc_currency_thou', ','), FALSE, NULL, 10, 10);
+      $form['currency']['uc_currency_thou']['#summary callback'] = 'summarize_null';
+    
+      $form['currency']['uc_currency_dec'] = uc_textfield(t('Decimal Marker'), variable_get('uc_currency_dec', '.'), FALSE, NULL, 10, 10);
+      $form['currency']['uc_currency_dec']['#summary callback'] = 'summarize_null';
+    
+      $form['currency']['uc_currency_prec'] = array(
+        '#type' => 'select',
+        '#title' => t('Number of decimal places'),
+        '#options' => drupal_map_assoc(array(0, 1, 2)),
+        '#summary callback' => 'summarize_null',
+        '#default_value' => variable_get('uc_currency_prec', 2),
+      );
+    
+      $form['weight'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Weight format'),
+        '#summary callback' => 'summarize_form',
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+      );
+      $form['weight']['instructions'] = array(
+        '#value' => '<div>'. t('Supply a format string for each unit. !value represents the weight value.') .'</div>',
+        '#summary callback' => 'summarize_null',
+      );
+      $units = array(
+        'lb' => t('Pounds'),
+        'oz' => t('Ounces'),
+        'kg' => t('Kilograms'),
+        'g' => t('Grams'),
+      );
+      $form['weight']['uc_weight_unit'] = array(
+        '#type' => 'select',
+        '#title' => t('Default unit of measurement'),
+        '#summary' => t('Weight format: @weight', array('@weight' => uc_weight_format(36))),
+        '#default_value' => variable_get('uc_weight_unit', 'lb'),
+    
+        '#options' => $units,
+      );
+      foreach ($units as $unit => $name) {
+        $form['weight']['uc_weight_format_'. $unit] = array(
+          '#type' => 'textfield',
+          '#title' => t('@unit format string', array('@unit' => $name)),
+          '#summary callback' => 'summarize_null',
+          '#default_value' => variable_get('uc_weight_format_'. $unit, '!value '. $unit),
+        );
+      }
+    
+      $form['length'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Length format'),
+        '#summary callback' => 'summarize_null',
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+      );
+      $form['length']['instructions'] = array(
+        '#value' => '<div>'. t('Supply a format string for each unit. !value represents the length value.') .'</div>',
+      );
+      $units = array(
+        'in' => t('Inches'),
+        'ft' => t('Feet'),
+        'cm' => t('Centimeters'),
+        'mm' => t('Millimeters'),
+      );
+      $form['length']['uc_length_unit'] = array(
+        '#type' => 'select',
+        '#title' => t('Default unit of measurement'),
+        '#default_value' => variable_get('uc_length_unit', 'in'),
+        '#options' => $units,
+      );
+      foreach ($units as $unit => $name) {
+        $form['length']['uc_length_format_'. $unit] = array(
+          '#type' => 'textfield',
+          '#title' => t('@unit format string', array('@unit' => $name)),
+          '#default_value' => variable_get('uc_store_length_format_'. $unit, '!value '. $unit),
+        );
+      }
+    
+      $form['date'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Date format'),
+        '#summary callback' => 'summarize_form',
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+      );
+      $form['date']['instructions'] = array(
+        '#value' => '<div>'. t('Supply a format string using !link syntax.', array('!link' => l(t('PHP date'), 'http://www.php.net/date'))) .'</div>',
+        '#summary callback' => 'summarize_form',
+      );
+      $form['date']['uc_date_format_default'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Default format string'),
+        '#default_value' => variable_get('uc_date_format_default', 'm/d/Y'),
+        '#summary' => t('Date format: @date', array('@date' => uc_date_format(8, 18, 2007))),
+      );
+      
+      $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => t('Save and continue'),
+      );
+      
+      return $form;
+}
+
+function uberdrupal_format_settings_form_submit() {
   $form_state = array('values' => $_POST);
   system_settings_form_submit(array(), $form_state);
 }
