@@ -247,6 +247,8 @@ function uberdrupal_country_settings_form(&$form_state, $url) {
 
 function uberdrupal_country_settings_form_submit() {
   $form_state = array('values' => $_POST);
+  $disable_usa = true;
+  $disable_canada = true;
 
   $files = array();
   if (! empty($form_state['values']['select_all'])) {
@@ -267,7 +269,7 @@ function uberdrupal_country_settings_form_submit() {
   else {
     // Enabling is additive, does not discard any already-selected regions,
     // uc_country_remove_form_submit() is too complex to copy here.
-    drupal_set_message(t("Enabling selected regions. Automatically pre-configured country settings are not deleted. Remove them from the UI in '<em>Administer : Store administration : Configuration : Country settings</em>' later if you wish."), 'info');
+    //drupal_set_message(t("Enabling selected regions. Automatically pre-configured country settings are not deleted. Remove them from the UI in '<em>Administer : Store administration : //Configuration : Country settings</em>' later if you wish."), 'info');
     
     // Import selected countries.
     $files = $form_state['values']['import_file'];
@@ -275,7 +277,36 @@ function uberdrupal_country_settings_form_submit() {
 
   // Install any country remaining in the files array.
   foreach ($files as $filename) {
+    if (strpos($filename,'_840_')) {
+        // We found a string inside string
+        $disable_usa = false;
+    }
+    if (strpos($filename,'_124_')) {
+        // We found a string inside string
+        $disable_canada = false;
+    }
     uc_country_import($filename);
+  }
+  
+  if($disable_usa) {
+      $country_id = 840;
+      $result = db_query("SELECT * FROM {uc_countries} WHERE country_id = %d", $country_id);
+      if (($country = db_fetch_object($result))) {
+          if ($country->version > 0) {
+            db_query("UPDATE {uc_countries} SET version = %d WHERE country_id = %d",
+                     0 - $country->version, $country_id);
+          }
+        }
+  }
+  if($disable_canada) {
+      $country_id = 124;
+      $result = db_query("SELECT * FROM {uc_countries} WHERE country_id = %d", $country_id);
+      if (($country = db_fetch_object($result))) {
+          if ($country->version > 0) {
+            db_query("UPDATE {uc_countries} SET version = %d WHERE country_id = %d",
+                     0 - $country->version, $country_id);
+          }
+        }
   }
 }
 
